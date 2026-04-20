@@ -1,36 +1,50 @@
-import{useEffect,useRef}from"react"
-import*as THREE from"three"
-import{OrbitControls}from"three/addons/controls/OrbitControls.js"
-export default function Viewer3D({lines,onReset,preview}){
-  const mountRef=useRef()
-  useEffect(()=>{
-    const el=mountRef.current,w=el.clientWidth,h=el.clientHeight
-    const scene=new THREE.Scene()
-    scene.fog=new THREE.FogExp2(0x09090b,0.18)
-    const camera=new THREE.PerspectiveCamera(50,w/h,0.01,50)
-    camera.position.set(0,0.2,3.5)
-    const renderer=new THREE.WebGLRenderer({antialias:true})
-    renderer.setSize(w,h);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor(0x09090b)
+import { useEffect, useRef } from "react"
+import * as THREE from "three"
+import { OrbitControls } from "three/addons/controls/OrbitControls.js"
+
+export default function Viewer3D({ lines, onReset, previews, threshold, onThreshold }) {
+  const mountRef = useRef()
+
+  useEffect(() => {
+    const el = mountRef.current, w = el.clientWidth, h = el.clientHeight
+    const scene = new THREE.Scene()
+    scene.fog = new THREE.FogExp2(0x09090b, 0.18)
+    const camera = new THREE.PerspectiveCamera(50, w / h, 0.01, 50)
+    camera.position.set(0, 0.2, 3.5)
+    const renderer = new THREE.WebGLRenderer({ antialias: true })
+    renderer.setSize(w, h)
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
+    renderer.setClearColor(0x09090b)
     el.appendChild(renderer.domElement)
-    const controls=new OrbitControls(camera,renderer.domElement)
-    controls.enableDamping=true;controls.dampingFactor=0.06;controls.autoRotate=true;controls.autoRotateSpeed=0.9
-    const pos=new Float32Array(lines.length*6)
-    lines.forEach((s,i)=>pos.set(s,i*6))
-    const geo=new THREE.BufferGeometry()
-    geo.setAttribute("position",new THREE.BufferAttribute(pos,3))
-    scene.add(new THREE.LineSegments(geo,new THREE.LineBasicMaterial({color:0xfbbf24})))
-    const grid=new THREE.GridHelper(6,20,0x27272a,0x18181b)
-    grid.position.y=-1.2;scene.add(grid)
+    const controls = new OrbitControls(camera, renderer.domElement)
+    controls.enableDamping = true
+    controls.dampingFactor = 0.06
+    controls.autoRotate = true
+    controls.autoRotateSpeed = 0.9
+
+    const pos = new Float32Array(lines.length * 6)
+    lines.forEach((s, i) => pos.set(s, i * 6))
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3))
+    scene.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xfbbf24 })))
+
+    const grid = new THREE.GridHelper(6, 20, 0x27272a, 0x18181b)
+    grid.position.y = -1.2
+    scene.add(grid)
+
     let raf
-    const animate=()=>{raf=requestAnimationFrame(animate);controls.update();renderer.render(scene,camera)}
+    const animate = () => { raf = requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera) }
     animate()
-    const onResize=()=>{const w=el.clientWidth,h=el.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h)}
-    window.addEventListener("resize",onResize)
-    return()=>{cancelAnimationFrame(raf);window.removeEventListener("resize",onResize);geo.dispose();renderer.dispose();if(el.contains(renderer.domElement))el.removeChild(renderer.domElement)}
-  },[lines])
-  return(
+    const onResize = () => { const w = el.clientWidth, h = el.clientHeight; camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h) }
+    window.addEventListener("resize", onResize)
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", onResize); geo.dispose(); renderer.dispose(); if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement) }
+  }, [lines])
+
+  return (
     <div className="relative w-full h-full">
-      <div ref={mountRef} className="w-full h-full"/>
+      <div ref={mountRef} className="w-full h-full" />
+
+      {/* Top bar */}
       <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-5 py-4 bg-gradient-to-b from-zinc-950/80 to-transparent">
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 rounded-md bg-amber-400/20 border border-amber-400/30 flex items-center justify-center">
@@ -38,10 +52,35 @@ export default function Viewer3D({lines,onReset,preview}){
           </div>
           <span className="text-xs font-semibold text-zinc-300 tracking-wide">LAMP WIREFRAME</span>
         </div>
-        <button onClick={onReset} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-800/80 border border-zinc-700/60 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors duration-150 backdrop-blur-sm">Try another photo</button>
+        <button onClick={onReset} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-800/80 border border-zinc-700/60 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors duration-150 backdrop-blur-sm">
+          Try another photo
+        </button>
       </div>
-      {preview&&<div className="absolute bottom-5 left-5"><div className="w-20 h-20 rounded-lg overflow-hidden border border-zinc-700/60 bg-zinc-900 shadow-xl"><img src={preview} alt="original" className="w-full h-full object-cover opacity-70"/></div><p className="mt-1.5 text-[10px] text-zinc-600 text-center">original</p></div>}
-      <p className="absolute bottom-5 right-5 text-[10px] text-zinc-600 text-right leading-relaxed">drag to rotate<br/>scroll to zoom</p>
+
+      {/* Threshold slider */}
+      <div className="absolute bottom-5 right-5 flex flex-col gap-1.5 items-end">
+        <label className="text-[10px] text-zinc-500 tracking-wide">BG THRESHOLD <span className="text-zinc-400 font-medium">{threshold}</span></label>
+        <input
+          type="range" min="0" max="100" step="1" value={threshold}
+          onChange={e => onThreshold(Number(e.target.value))}
+          className="w-32 h-1.5 appearance-none rounded-full bg-zinc-700 accent-amber-400 cursor-pointer"
+        />
+      </div>
+
+      {/* Previews */}
+      {previews?.length > 0 && (
+        <div className="absolute bottom-5 left-5 flex gap-2">
+          {previews.map((url, i) => (
+            <div key={i}>
+              <div className="w-16 h-16 rounded-lg overflow-hidden border border-zinc-700/60 bg-zinc-900 shadow-xl">
+                <img src={url} alt={`photo ${i + 1}`} className="w-full h-full object-cover opacity-70" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className="absolute bottom-16 right-5 text-[10px] text-zinc-600 text-right leading-relaxed">drag to rotate<br />scroll to zoom</p>
     </div>
   )
 }
