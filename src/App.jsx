@@ -5,6 +5,7 @@ import Viewer3D from "./components/Viewer3D"
 import { processImage } from "./lib/imageProcess"
 import { buildWireframe } from "./lib/wireframe"
 import { analyzeWithClaude } from "./lib/claudeApi"
+import { buildFromTemplate } from "./lib/templates/index.js"
 
 function loadImage(file) {
   return new Promise((resolve, reject) => {
@@ -16,10 +17,10 @@ function loadImage(file) {
   })
 }
 
-function extractLines(imgs, threshold, bboxes = null) {
+function extractLines(imgs, threshold) {
   const contours = []
-  for (let i = 0; i < imgs.length; i++) {
-    const c = processImage(imgs[i], threshold, bboxes ? bboxes[i] : null)
+  for (const img of imgs) {
+    const c = processImage(img, threshold)
     if (c.length) contours.push(...c)
   }
   return contours.length ? buildWireframe(contours) : null
@@ -32,10 +33,9 @@ export default function App() {
   const [error, setError] = useState(null)
   const [threshold, setThreshold] = useState(30)
   const [loadedImgs, setLoadedImgs] = useState([])
-  const [bboxes, setBboxes] = useState(null)
   const [processingStatus, setProcessingStatus] = useState("")
   const [apiKey, setApiKey] = useState(() => localStorage.getItem("anthropic-api-key") || "")
-  const [aiUsed, setAiUsed] = useState(false)
+  const [templateInfo, setTemplateInfo] = useState(null)  // { template, params }
 
   function handleApiKeyChange(key) {
     setApiKey(key)
@@ -45,7 +45,7 @@ export default function App() {
   async function handleSubmit(files, description) {
     setError(null)
     setState("processing")
-    setAiUsed(false)
+    setTemplateInfo(null)
 
     try {
       setProcessingStatus("Loading images…")
@@ -56,22 +56,30 @@ export default function App() {
       setPreviews(urls)
       setLoadedImgs(imgs)
 
-      let newBboxes = null
-      if (apiKey && description.trim()) {
+      // Path A: Claude Vision → template + params → wireframe
+      if (apiKey) {
         try {
-          setProcessingStatus("Asking Claude to locate the subject…")
-          newBboxes = await Promise.all(files.map(f => analyzeWithClaude(f, description, apiKey)))
-          setAiUsed(true)
+          setProcessingStatus("Asking Claude to identify the subject…")
+          // Use the first file for analysis; future: merge multiple
+          const result = await analyzeWithClaude(files[0], description, apiKey)
+          setTemplateInfo(result)
+          setProcessingStatus(`Building ${result.template} wireframe…`)
+          const templateLines = buildFromTemplate(result.template, result.params)
+          if (templateLines.length) {
+            setLines(templateLines)
+            setState("result")
+            return
+          }
         } catch (e) {
-          console.warn("Claude API failed, falling back:", e.message)
+          console.warn("Claude failed, falling back to image extraction:", e.message)
         }
       }
 
-      setBboxes(newBboxes)
-      setProcessingStatus("Extracting outline…")
-      const result = extractLines(imgs, threshold, newBboxes)
+      // Path B: image edge extraction fallback (no API key or Claude failed)
+      setProcessingStatus("Extracting outline from image…")
+      const result = extractLines(imgs, threshold)
       if (!result) {
-        setError("No clear outline found — try adjusting the threshold slider, or add a description with an API key.")
+        setError("No clear outline found — add an Anthropic API key and description for best results.")
         setState("idle")
         return
       }
@@ -85,8 +93,9 @@ export default function App() {
 
   function handleThreshold(t) {
     setThreshold(t)
-    if (!loadedImgs.length) return
-    const result = extractLines(loadedImgs, t, bboxes)
+    // Only affects fallback image-extraction path; re-run if no template
+    if (!loadedImgs.length || templateInfo) return
+    const result = extractLines(loadedImgs, t)
     if (result) setLines(result)
   }
 
@@ -96,9 +105,8 @@ export default function App() {
     previews.forEach(URL.revokeObjectURL)
     setPreviews([])
     setLoadedImgs([])
-    setBboxes(null)
     setError(null)
-    setAiUsed(false)
+    setTemplateInfo(null)
   }
 
   return (
@@ -126,7 +134,7 @@ export default function App() {
             previews={previews}
             threshold={threshold}
             onThreshold={handleThreshold}
-            aiUsed={aiUsed}
+            templateInfo={templateInfo}
           />
         )}
       </div>
