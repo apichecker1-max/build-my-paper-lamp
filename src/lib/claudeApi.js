@@ -34,13 +34,13 @@ Return ONLY this JSON (no markdown, no explanation):
 For bird template, use these params instead: bodyLength, bodyHeight, bodyWidth, headSize, wingSpan, tailLength, tailSpread, beakLength.
 Adjust multipliers between 0.4 and 2.0. Set "sitting": true if the animal is sitting/crouching.`
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  // Use /api/claude proxy to avoid CORS (Vite dev proxy + Vercel function in production)
+  const res = await fetch('/api/claude', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-calls': 'true',
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',

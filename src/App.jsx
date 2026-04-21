@@ -60,7 +60,6 @@ export default function App() {
       if (apiKey) {
         try {
           setProcessingStatus("Asking Claude to identify the subject…")
-          // Use the first file for analysis; future: merge multiple
           const result = await analyzeWithClaude(files[0], description, apiKey)
           setTemplateInfo(result)
           setProcessingStatus(`Building ${result.template} wireframe…`)
@@ -71,7 +70,9 @@ export default function App() {
             return
           }
         } catch (e) {
-          console.warn("Claude failed, falling back to image extraction:", e.message)
+          setError(`Claude API error: ${e.message}`)
+          setState("idle")
+          return
         }
       }
 
