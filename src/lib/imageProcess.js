@@ -20,7 +20,8 @@ export function processImage(img, threshold = 30) {
   ctx.drawImage(img, 0, 0, w, h)
   const { data } = ctx.getImageData(0, 0, w, h)
 
-  const fg = segment(data, w, h, threshold)
+  const fgRaw = segment(data, w, h, threshold)
+  const fg = keepLargestComponent(fgRaw, w, h)
   const raw = traceBoundary(fg, w, h)
   if (raw.length < 6) return []
 
@@ -29,6 +30,41 @@ export function processImage(img, threshold = 30) {
 
   // Normalize to [-1, 1], y-up
   return [simplified.map(([x, y]) => [(x / w) * 2 - 1, -((y / h) * 2 - 1)])]
+}
+
+// BFS to find and isolate the largest connected foreground component.
+// Prevents Moore tracing from getting stuck on noise pixels near the image edge.
+function keepLargestComponent(fg, w, h) {
+  const label = new Int32Array(w * h).fill(-1)
+  let maxSize = 0, maxLabel = 0, nextLabel = 0
+  const sizes = []
+  const DIRS4 = [[-1,0],[1,0],[0,-1],[0,1]]
+
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!fg[y * w + x] || label[y * w + x] >= 0) continue
+    const comp = nextLabel++
+    const queue = [x, y]
+    let qi = 0
+    label[y * w + x] = comp
+    let size = 0
+    while (qi < queue.length) {
+      const cx = queue[qi++], cy = queue[qi++]
+      size++
+      for (const [dx, dy] of DIRS4) {
+        const nx = cx + dx, ny = cy + dy
+        if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue
+        if (!fg[ny * w + nx] || label[ny * w + nx] >= 0) continue
+        label[ny * w + nx] = comp
+        queue.push(nx, ny)
+      }
+    }
+    sizes.push(size)
+    if (size > maxSize) { maxSize = size; maxLabel = comp }
+  }
+
+  const out = new Uint8Array(w * h)
+  for (let i = 0; i < w * h; i++) if (label[i] === maxLabel) out[i] = 1
+  return out
 }
 
 // Moore-neighbor boundary tracing with Jacob's stopping criterion.
