@@ -110,17 +110,17 @@ Result: a `Uint8Array` (`fg`) where `1 = foreground (subject)`, `0 = background`
 
 **Known limitation:** seeds only from corners. If the subject touches the image border (e.g. a cropped portrait), parts of it will be flood-filled as background.
 
-### Step 3 — Radial sweep contour extraction
+### Step 3 — Moore-neighbor boundary tracing
 
-1. Find the **center of mass** of all foreground pixels.
-2. Cast **180 rays** evenly distributed around 360°.
-3. For each ray, walk outward from the centroid pixel by pixel. Track the **last foreground pixel** seen — this is the outermost boundary point in that direction.
-4. Collect all 180 boundary points as the contour.
+1. Scan the foreground mask raster-order to find the **topmost-leftmost foreground pixel** — this is the trace start `s`. Its left neighbor is guaranteed background.
+2. Walk the 8-connected boundary clockwise using **Moore-neighbor tracing**: at each step, start the neighbor search from the last background pixel seen and sweep clockwise until a foreground pixel is found. That pixel becomes the new current pixel; the last skipped pixel becomes the new background reference.
+3. Stop when the trace returns to `s` (Jacob's stopping criterion).
 
-**Why radial sweep instead of row-scan silhouette?**
-Row-scan only captures left/right extremes per row — it works for simple blob shapes but loses information on concave or irregular outlines (e.g. a dog's legs or ears). Radial sweep captures the full angular boundary.
+This produces the **exact pixel boundary** of the foreground region, including all concavities — legs, ears, tail, gaps between limbs, etc.
 
-**Known limitation:** for strongly concave shapes (e.g. a dog's legs spread wide), the radial sweep from a central centroid may skip interior concavities. The result approximates the convex hull in those regions.
+### Step 4 — Douglas–Peucker simplification
+
+The raw boundary can have thousands of points. `douglasPeucker(pts, eps=3)` reduces it to the minimal set of points where no removed point was more than 3 pixels from the simplified line. Typically reduces a 1000-point boundary to 80–150 points while preserving all meaningful shape detail.
 
 ### Step 4 — Normalize
 
@@ -217,7 +217,7 @@ Contour normalization flips Y so that "up in the photo" = "up in 3D".
 
 ### Contour quality
 - **No Douglas–Peucker simplification** — the 180-point radial contour could be reduced to 30–50 points for a cleaner wireframe while preserving the silhouette shape.
-- **Concave shapes** — radial sweep from centroid approximates concavities as straight chords. Adding a second pass with a marching-squares or boundary-tracing algorithm would capture re-entrant shapes.
+- **Disconnected foreground** — Moore tracing finds only the boundary of the first (topmost-leftmost) connected region. A dog with a separate shadow or reflection may produce a partial contour. Fix: find the largest connected component before tracing.
 
 ### Wireframe model
 - **Single-contour fallback is symmetric** — for a dog, all 4 auto-generated panels are identical, so the lamp looks the same from every angle. Multiple photos from different viewpoints produce a much more interesting result.
