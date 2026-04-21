@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react"
 import * as THREE from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 
-export default function Viewer3D({ lines, onReset, previews, threshold, onThreshold }) {
+export default function Viewer3D({ lines, onReset, previews, threshold, onThreshold, aiUsed }) {
   const mountRef = useRef()
 
   useEffect(() => {
@@ -51,6 +51,9 @@ export default function Viewer3D({ lines, onReset, previews, threshold, onThresh
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6M10 22h4M12 2C8 2 5 5 5 9c0 2.4 1 4.5 2.6 6H16.4C18 13.5 19 11.4 19 9c0-4-3-7-7-7z"/></svg>
           </div>
           <span className="text-xs font-semibold text-zinc-300 tracking-wide">LAMP WIREFRAME</span>
+          {aiUsed && (
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-400/15 border border-amber-400/30 text-amber-400 tracking-wide">AI</span>
+          )}
         </div>
         <button onClick={onReset} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-800/80 border border-zinc-700/60 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors duration-150 backdrop-blur-sm">
           Try another photo

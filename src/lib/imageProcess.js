@@ -6,7 +6,8 @@ const G5 = [1/256,4/256,6/256,4/256,1/256,4/256,16/256,24/256,16/256,4/256,6/256
 const D8 = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]]
 const dirIdx = [[7,0,1],[6,0,2],[5,4,3]]
 
-export function processImage(img, threshold = 30) {
+// bbox: optional [x1, y1, x2, y2] as 0–1 fractions — crops image to subject before processing.
+export function processImage(img, threshold = 30, bbox = null) {
   const MAX = 480
   const scale = Math.min(MAX / img.naturalWidth, MAX / img.naturalHeight, 1)
   const w = Math.round(img.naturalWidth * scale)
@@ -15,7 +16,17 @@ export function processImage(img, threshold = 30) {
   const canvas = document.createElement('canvas')
   canvas.width = w; canvas.height = h
   const ctx = canvas.getContext('2d')
-  ctx.drawImage(img, 0, 0, w, h)
+
+  if (bbox) {
+    const [x1, y1, x2, y2] = bbox
+    const sx = Math.floor(x1 * img.naturalWidth)
+    const sy = Math.floor(y1 * img.naturalHeight)
+    const sw = Math.ceil((x2 - x1) * img.naturalWidth)
+    const sh = Math.ceil((y2 - y1) * img.naturalHeight)
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h)
+  } else {
+    ctx.drawImage(img, 0, 0, w, h)
+  }
   const { data } = ctx.getImageData(0, 0, w, h)
 
   // threshold 0→100 maps Sobel sensitivity 40→5 (higher user threshold = more edges detected)
