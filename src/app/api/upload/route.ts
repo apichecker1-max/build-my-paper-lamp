@@ -26,8 +26,8 @@ export async function POST(req: NextRequest) {
       filenames.push(file.name || `photo_${filenames.length}.jpg`)
     }
 
-    // Demo mode: skip OpenScanCloud if no credentials
-    const isDemoMode = !process.env.OPENSCAN_TOKEN && process.env.NODE_ENV !== 'production'
+    // Demo mode: skip OpenScanCloud when no token is configured
+    const isDemoMode = !process.env.OPENSCAN_TOKEN
     const jobId = uuidv4()
 
     if (isDemoMode) {

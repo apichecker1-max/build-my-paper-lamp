@@ -23,9 +23,10 @@ function ProcessingContent() {
 
   useEffect(() => {
     if (job?.status === 'completed') {
-      router.push(`/results?jobId=${jobId}`)
+      const modelParam = job.modelUrl ? `&modelUrl=${encodeURIComponent(job.modelUrl)}` : ''
+      router.push(`/results?jobId=${jobId}${modelParam}`)
     }
-  }, [job?.status, jobId, router])
+  }, [job?.status, job?.modelUrl, jobId, router])
 
   if (!jobId) {
     return (
