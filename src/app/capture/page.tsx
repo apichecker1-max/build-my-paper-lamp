@@ -27,25 +27,18 @@ export default function CapturePage() {
       const formData = new FormData()
       photos.forEach((p, i) => formData.append('photos', p.blob, `photo_${i}.jpg`))
 
-      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData })
-      if (!uploadRes.ok) {
-        const body = await uploadRes.json()
+      const res = await fetch('/api/upload', { method: 'POST', body: formData })
+      if (!res.ok) {
+        const body = await res.json()
         throw new Error(body.error ?? 'Upload failed')
       }
-      const { jobId } = await uploadRes.json()
+      const data = await res.json()
 
-      // Start processing
-      const processRes = await fetch('/api/process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId }),
-      })
-      if (!processRes.ok) {
-        const body = await processRes.json()
-        throw new Error(body.error ?? 'Processing failed to start')
+      if (data.demo) {
+        router.push(`/processing?jobId=${data.jobId}&demo=true`)
+      } else {
+        router.push(`/processing?jobId=${data.jobId}&projectId=${encodeURIComponent(data.projectId)}`)
       }
-
-      router.push(`/processing?jobId=${jobId}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
       setUploading(false)
@@ -56,7 +49,6 @@ export default function CapturePage() {
 
   return (
     <main className="min-h-screen bg-amber-50 px-4 py-6 max-w-sm mx-auto">
-      {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <a href="/" className="text-amber-600 text-2xl leading-none">←</a>
         <div>
@@ -65,7 +57,6 @@ export default function CapturePage() {
         </div>
       </div>
 
-      {/* Progress bar */}
       <div className="mb-5">
         <div className="flex justify-between text-xs text-amber-700 mb-1">
           <span>{photos.length} photos</span>
@@ -79,20 +70,15 @@ export default function CapturePage() {
         </div>
       </div>
 
-      {/* Camera */}
       <Camera photos={photos} onPhotos={setPhotos} />
-
-      {/* Gallery */}
       <PhotoGallery photos={photos} onDelete={handleDelete} />
 
-      {/* Error */}
       {error && (
         <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
           {error}
         </div>
       )}
 
-      {/* Process button */}
       <div className="mt-6 pb-8">
         <button
           onClick={handleProcess}

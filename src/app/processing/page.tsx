@@ -1,113 +1,167 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useJob } from '@/hooks/useJob'
-import { Suspense } from 'react'
 
-const STEPS = [
-  { label: 'Uploading photos', progress: 10 },
-  { label: 'Analysing images', progress: 25 },
-  { label: 'Building point cloud', progress: 45 },
-  { label: 'Generating 3D mesh', progress: 65 },
-  { label: 'Texturing model', progress: 80 },
-  { label: 'Finalising', progress: 95 },
-  { label: 'Complete!', progress: 100 },
+const DEMO_STEPS = [
+  { label: 'Analysing photos',      progress: 10, ms: 1500 },
+  { label: 'Detecting keypoints',   progress: 22, ms: 2000 },
+  { label: 'Building point cloud',  progress: 38, ms: 2500 },
+  { label: 'Generating mesh',       progress: 55, ms: 2500 },
+  { label: 'Texturing model',       progress: 72, ms: 2000 },
+  { label: 'Optimising geometry',   progress: 88, ms: 1500 },
+  { label: 'Scan complete!',        progress: 100, ms: 800 },
+]
+
+const DEMO_MODEL_URL =
+  'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Duck/glTF-Binary/Duck.glb'
+
+const REAL_STEPS = [
+  { label: 'Uploading photos',      progress: 10 },
+  { label: 'Analysing images',      progress: 25 },
+  { label: 'Building point cloud',  progress: 45 },
+  { label: 'Generating 3D mesh',    progress: 65 },
+  { label: 'Texturing model',       progress: 80 },
+  { label: 'Finalising',            progress: 95 },
+  { label: 'Complete!',             progress: 100 },
 ]
 
 function ProcessingContent() {
   const router = useRouter()
   const params = useSearchParams()
-  const jobId = params.get('jobId')
-  const { job, error } = useJob(jobId)
+  const jobId = params.get('jobId') ?? ''
+  const projectId = params.get('projectId') ?? ''
+  const isDemo = params.get('demo') === 'true'
 
+  const [progress, setProgress] = useState(0)
+  const [step, setStep] = useState('Starting…')
+  const [failed, setFailed] = useState(false)
+  const [failMsg, setFailMsg] = useState('')
+  const doneRef = useRef(false)
+
+  // Demo mode: advance through steps with setTimeout — no server calls
   useEffect(() => {
-    if (job?.status === 'completed') {
-      const modelParam = job.modelUrl ? `&modelUrl=${encodeURIComponent(job.modelUrl)}` : ''
-      router.push(`/results?jobId=${jobId}${modelParam}`)
+    if (!isDemo) return
+    let i = 0
+    function next() {
+      if (doneRef.current) return
+      if (i >= DEMO_STEPS.length) return
+      const s = DEMO_STEPS[i++]
+      setProgress(s.progress)
+      setStep(s.label)
+      if (s.progress === 100) {
+        doneRef.current = true
+        setTimeout(() => {
+          router.push(`/results?jobId=${jobId}&modelUrl=${encodeURIComponent(DEMO_MODEL_URL)}`)
+        }, 600)
+        return
+      }
+      setTimeout(next, s.ms)
     }
-  }, [job?.status, job?.modelUrl, jobId, router])
+    setTimeout(next, 800)
+  }, [isDemo, jobId, router])
+
+  // Real mode: poll /api/status every 4 seconds
+  useEffect(() => {
+    if (isDemo || !projectId) return
+    const id = setInterval(async () => {
+      if (doneRef.current) return
+      try {
+        const res = await fetch(`/api/status?projectId=${encodeURIComponent(projectId)}`)
+        const data = await res.json()
+        if (data.status === 'failed') {
+          doneRef.current = true
+          clearInterval(id)
+          setFailed(true)
+          setFailMsg(data.error ?? 'Scan failed')
+          return
+        }
+        if (data.status === 'completed') {
+          doneRef.current = true
+          clearInterval(id)
+          router.push(`/results?jobId=${jobId}&modelUrl=${encodeURIComponent(data.modelUrl)}`)
+          return
+        }
+        setProgress(data.progress ?? 0)
+        setStep(data.step ?? 'Processing…')
+      } catch {
+        // network hiccup — keep polling
+      }
+    }, 4000)
+    return () => clearInterval(id)
+  }, [isDemo, projectId, jobId, router])
 
   if (!jobId) {
     return (
       <div className="text-center pt-20 text-amber-700">
-        No job ID. <a href="/capture" className="underline">Start over</a>
+        No job found. <a href="/capture" className="underline">Start over</a>
       </div>
     )
   }
 
-  const progress = job?.progress ?? 0
-  const step = job?.step ?? 'Starting…'
-  const isFailed = job?.status === 'failed'
+  if (failed) {
+    return (
+      <main className="min-h-screen bg-amber-50 flex flex-col items-center justify-center px-6">
+        <div className="text-5xl mb-4">😞</div>
+        <h2 className="text-xl font-bold text-red-700 mb-2">Processing failed</h2>
+        <p className="text-sm text-red-500 mb-6 text-center">{failMsg}</p>
+        <a href="/capture" className="bg-amber-500 text-white font-bold px-8 py-3 rounded-2xl">
+          Try again
+        </a>
+      </main>
+    )
+  }
+
+  const steps = isDemo ? DEMO_STEPS : REAL_STEPS
 
   return (
     <main className="min-h-screen bg-amber-50 flex flex-col items-center justify-center px-6 max-w-sm mx-auto">
-      {isFailed ? (
-        <div className="text-center">
-          <div className="text-5xl mb-4">😞</div>
-          <h2 className="text-xl font-bold text-red-700 mb-2">Processing failed</h2>
-          <p className="text-sm text-red-500 mb-6">{job?.error ?? 'Unknown error'}</p>
-          <a
-            href="/capture"
-            className="inline-block bg-amber-500 text-white font-bold px-8 py-3 rounded-2xl"
-          >
-            Try again
-          </a>
+      {/* Spinner */}
+      <div className="relative mb-8">
+        <div className="w-28 h-28 rounded-full border-4 border-amber-100 flex items-center justify-center">
+          <div className="w-28 h-28 absolute rounded-full border-4 border-t-amber-500 border-r-amber-400 border-b-transparent border-l-transparent animate-spin" />
+          <div className="text-4xl">🏮</div>
         </div>
-      ) : (
-        <>
-          {/* Spinner */}
-          <div className="relative mb-8">
-            <div className="w-28 h-28 rounded-full border-4 border-amber-100 flex items-center justify-center">
-              <div className="w-28 h-28 absolute rounded-full border-4 border-t-amber-500 border-r-amber-400 border-b-transparent border-l-transparent animate-spin" />
-              <div className="text-4xl">🏮</div>
+      </div>
+
+      <h2 className="text-xl font-bold text-amber-900 mb-1">Processing your object</h2>
+      <p className="text-sm text-amber-600 mb-8 text-center">{step}</p>
+
+      <div className="w-full mb-6">
+        <div className="w-full bg-amber-100 rounded-full h-3">
+          <div
+            className="bg-gradient-to-r from-amber-400 to-orange-500 h-3 rounded-full transition-all duration-700"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <div className="text-right text-xs text-amber-500 mt-1">{progress}%</div>
+      </div>
+
+      <div className="w-full space-y-2">
+        {steps.map((s) => (
+          <div key={s.label} className="flex items-center gap-3">
+            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0 ${
+              progress >= s.progress ? 'bg-amber-500 text-white' : 'bg-amber-100 text-amber-300'
+            }`}>
+              {progress >= s.progress ? '✓' : ''}
             </div>
+            <span className={`text-sm ${progress >= s.progress ? 'text-amber-800' : 'text-amber-300'}`}>
+              {s.label}
+            </span>
           </div>
+        ))}
+      </div>
 
-          <h2 className="text-xl font-bold text-amber-900 mb-1">Processing your object</h2>
-          <p className="text-sm text-amber-600 mb-8 text-center">{step}</p>
+      {isDemo && (
+        <p className="mt-6 text-xs text-amber-400 text-center bg-amber-100 rounded-xl px-4 py-2">
+          Demo mode — get your OpenScanCloud token to process real photos
+        </p>
+      )}
 
-          {/* Progress bar */}
-          <div className="w-full mb-6">
-            <div className="w-full bg-amber-100 rounded-full h-3">
-              <div
-                className="bg-gradient-to-r from-amber-400 to-orange-500 h-3 rounded-full transition-all duration-700"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <div className="text-right text-xs text-amber-500 mt-1">{progress}%</div>
-          </div>
-
-          {/* Step indicators */}
-          <div className="w-full space-y-2">
-            {STEPS.map((s) => {
-              const done = progress >= s.progress
-              const active = !done && Math.abs(progress - s.progress) < 25
-              return (
-                <div key={s.label} className="flex items-center gap-3">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0 ${
-                    done ? 'bg-amber-500 text-white' : 'bg-amber-100 text-amber-300'
-                  }`}>
-                    {done ? '✓' : ''}
-                  </div>
-                  <span className={`text-sm ${done ? 'text-amber-800' : 'text-amber-300'}`}>
-                    {s.label}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-
-          {error && (
-            <p className="mt-6 text-xs text-red-400 text-center">
-              Connection issue — retrying… ({error})
-            </p>
-          )}
-
-          <p className="mt-8 text-xs text-amber-400 text-center">
-            This usually takes 3–10 minutes. Keep this page open.
-          </p>
-        </>
+      {!isDemo && (
+        <p className="mt-8 text-xs text-amber-400 text-center">
+          This usually takes 3–10 minutes. Keep this page open.
+        </p>
       )}
     </main>
   )
@@ -115,7 +169,11 @@ function ProcessingContent() {
 
 export default function ProcessingPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-amber-50 flex items-center justify-center"><div className="w-8 h-8 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" /></div>}>
+    <Suspense fallback={
+      <div className="min-h-screen bg-amber-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
       <ProcessingContent />
     </Suspense>
   )
