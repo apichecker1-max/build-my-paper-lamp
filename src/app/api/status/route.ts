@@ -1,31 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getProjectStatus } from '@/lib/openscan'
+import { getTaskStatus } from '@/lib/tripo'
 
-// Stateless: polls OpenScanCloud directly using the projectId from the URL.
-// No server-side job storage needed — demo mode is handled entirely client-side.
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const projectId = searchParams.get('projectId')
+  const taskId = searchParams.get('taskId')
 
-  if (!projectId) {
-    return NextResponse.json({ error: 'projectId required' }, { status: 400 })
+  if (!taskId) {
+    return NextResponse.json({ error: 'taskId required' }, { status: 400 })
   }
 
   try {
-    const scan = await getProjectStatus(projectId)
+    const task = await getTaskStatus(taskId)
 
-    if (scan.status === 'failed' || scan.error) {
-      return NextResponse.json({ status: 'failed', error: scan.error ?? 'Scan failed' })
+    if (task.status === 'failed' || task.status === 'banned' || task.status === 'expired') {
+      return NextResponse.json({ status: 'failed', error: task.error ?? 'Generation failed' })
     }
 
-    if (scan.status === 'completed' && scan.downloadUrl) {
-      return NextResponse.json({ status: 'completed', progress: 100, modelUrl: scan.downloadUrl })
+    if (task.status === 'success' && task.modelUrl) {
+      return NextResponse.json({ status: 'completed', progress: 100, modelUrl: task.modelUrl })
     }
 
+    // pending or running
+    const progress = task.status === 'pending' ? 10 : Math.max(10, task.progress)
     return NextResponse.json({
       status: 'scanning',
-      progress: scan.progress ?? 0,
-      step: `3D scanning in progress (${scan.progress ?? 0}%)`,
+      progress,
+      step: task.status === 'pending' ? 'Queued — waiting to start…' : `Generating 3D model… (${progress}%)`,
     })
   } catch (err) {
     console.error('Status poll error:', err)

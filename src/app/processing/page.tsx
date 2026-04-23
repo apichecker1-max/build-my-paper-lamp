@@ -30,7 +30,7 @@ function ProcessingContent() {
   const router = useRouter()
   const params = useSearchParams()
   const jobId = params.get('jobId') ?? ''
-  const projectId = params.get('projectId') ?? ''
+  const taskId = params.get('taskId') ?? ''
   const isDemo = params.get('demo') === 'true'
 
   const [progress, setProgress] = useState(0)
@@ -63,11 +63,11 @@ function ProcessingContent() {
 
   // Real mode: poll /api/status every 4 seconds
   useEffect(() => {
-    if (isDemo || !projectId) return
+    if (isDemo || !taskId) return
     const id = setInterval(async () => {
       if (doneRef.current) return
       try {
-        const res = await fetch(`/api/status?projectId=${encodeURIComponent(projectId)}`)
+        const res = await fetch(`/api/status?taskId=${encodeURIComponent(taskId)}`)
         const data = await res.json()
         if (data.status === 'failed') {
           doneRef.current = true
@@ -89,7 +89,7 @@ function ProcessingContent() {
       }
     }, 4000)
     return () => clearInterval(id)
-  }, [isDemo, projectId, jobId, router])
+  }, [isDemo, taskId, jobId, router])
 
   if (!jobId) {
     return (
@@ -154,7 +154,7 @@ function ProcessingContent() {
 
       {isDemo && (
         <p className="mt-6 text-xs text-amber-400 text-center bg-amber-100 rounded-xl px-4 py-2">
-          Demo mode — get your OpenScanCloud token to process real photos
+          Demo mode — add your Tripo AI key to process real photos
         </p>
       )}
 

@@ -6,7 +6,7 @@ import Camera from '@/components/Camera'
 import PhotoGallery from '@/components/PhotoGallery'
 import { CapturedPhoto } from '@/types'
 
-const MIN_PHOTOS = 15
+const MIN_PHOTOS = 4
 
 export default function CapturePage() {
   const router = useRouter()
@@ -37,7 +37,7 @@ export default function CapturePage() {
       if (data.demo) {
         router.push(`/processing?jobId=${data.jobId}&demo=true`)
       } else {
-        router.push(`/processing?jobId=${data.jobId}&projectId=${encodeURIComponent(data.projectId)}`)
+        router.push(`/processing?jobId=${data.jobId}&taskId=${encodeURIComponent(data.taskId)}`)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
@@ -53,7 +53,7 @@ export default function CapturePage() {
         <a href="/" className="text-amber-600 text-2xl leading-none">←</a>
         <div>
           <h1 className="text-lg font-bold text-amber-900">Capture Photos</h1>
-          <p className="text-xs text-amber-600">Walk around your object — all angles</p>
+          <p className="text-xs text-amber-600">4 photos minimum — front, back, left, right</p>
         </div>
       </div>
 
