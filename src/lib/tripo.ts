@@ -7,8 +7,8 @@ function authHeader() {
 // Upload a single image buffer and return its file token
 export async function uploadFile(buffer: Buffer, filename: string): Promise<string> {
   const form = new FormData()
-  // Slice to exact bytes — Buffer may be a view of a larger shared ArrayBuffer
-  const slice = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+  // Uint8Array copy ensures we have a plain ArrayBuffer (avoids SharedArrayBuffer issues)
+  const slice = new Uint8Array(buffer).slice()
   form.append('file', new Blob([slice], { type: 'image/jpeg' }), filename)
 
   const res = await fetch(`${BASE_URL}/upload`, {
