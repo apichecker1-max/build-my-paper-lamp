@@ -27,12 +27,10 @@ export async function createTask(fileTokens: string[]): Promise<string> {
       ? {
           type: 'image_to_model',
           file: { type: 'jpg', file_encoding: 'raw', file_token: fileTokens[0] },
-          model_version: 'v2.5',
         }
       : {
           type: 'multiview_to_model',
           files: fileTokens.map((t) => ({ type: 'jpg', file_encoding: 'raw', file_token: t })),
-          model_version: 'v2.5',
         }
 
   const res = await fetch(`${BASE_URL}/task`, {
