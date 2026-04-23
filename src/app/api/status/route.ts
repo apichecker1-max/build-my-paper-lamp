@@ -11,6 +11,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const task = await getTaskStatus(taskId)
+    console.log(`[status] taskId=${taskId} status=${task.status} progress=${task.progress} modelUrl=${task.modelUrl ?? 'none'}`)
 
     if (task.status === 'failed' || task.status === 'banned' || task.status === 'expired') {
       return NextResponse.json({ status: 'failed', error: task.error ?? 'Generation failed' })
@@ -20,7 +21,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ status: 'completed', progress: 100, modelUrl: task.modelUrl })
     }
 
-    // pending or running
+    // success but no modelUrl yet — treat as still running
+    if (task.status === 'success' && !task.modelUrl) {
+      console.warn(`[status] taskId=${taskId} success but no modelUrl — raw:`, JSON.stringify(task))
+      return NextResponse.json({ status: 'scanning', progress: 95, step: 'Finalising model…' })
+    }
+
     const progress = task.status === 'pending' ? 10 : Math.max(10, task.progress)
     return NextResponse.json({
       status: 'scanning',
@@ -28,7 +34,7 @@ export async function GET(req: NextRequest) {
       step: task.status === 'pending' ? 'Queued — waiting to start…' : `Generating 3D model… (${progress}%)`,
     })
   } catch (err) {
-    console.error('Status poll error:', err)
+    console.error(`[status] taskId=${taskId} error:`, err)
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Status check failed' },
       { status: 500 }

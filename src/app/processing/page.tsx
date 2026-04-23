@@ -50,16 +50,21 @@ function ProcessingContent() {
   const [failed, setFailed] = useState(false)
   const [failMsg, setFailMsg] = useState('')
   const [lastPoll, setLastPoll] = useState<string | null>(null)
+  const [timedOut, setTimedOut] = useState(false)
   const doneRef = useRef(false)
+  const elapsedSecs = useRef(0)
   const elapsed = useElapsed()
 
-  // Fake progress: slowly creep toward 88% so bar never looks frozen
+  // Fake progress + 5-min timeout
   useEffect(() => {
     if (isDemo || doneRef.current) return
     const id = setInterval(() => {
+      elapsedSecs.current += 1
+      if (elapsedSecs.current >= 300 && !doneRef.current) {
+        setTimedOut(true)
+      }
       setProgress(prev => {
         if (prev >= 88 || doneRef.current) return prev
-        // Slow down as it approaches 88 to feel natural
         const increment = prev < 30 ? 0.8 : prev < 60 ? 0.4 : 0.15
         return Math.min(88, prev + increment)
       })
@@ -206,11 +211,25 @@ function ProcessingContent() {
         </p>
       )}
 
-      {!isDemo && (
+      {!isDemo && !timedOut && (
         <div className="mt-6 bg-amber-100 rounded-xl px-4 py-3 text-center">
           <p className="text-xs text-amber-600 font-medium">Tripo AI is building your model</p>
           <p className="text-xs text-amber-400 mt-0.5">Usually takes 1–3 minutes — keep this page open</p>
         </div>
+      )}
+
+      {!isDemo && timedOut && (
+        <div className="mt-6 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-center">
+          <p className="text-sm text-red-700 font-medium">Taking longer than expected</p>
+          <p className="text-xs text-red-500 mt-1 mb-3">Tripo AI may be under heavy load or the task got stuck.</p>
+          <a href="/capture" className="inline-block bg-amber-500 text-white text-sm font-bold px-5 py-2 rounded-xl">
+            Start over
+          </a>
+        </div>
+      )}
+
+      {!isDemo && taskId && (
+        <p className="mt-3 text-xs text-amber-300 text-center break-all">Task: {taskId.slice(0, 16)}…</p>
       )}
     </main>
   )
