@@ -22,16 +22,12 @@ export async function uploadFile(buffer: Buffer, filename: string): Promise<stri
 
 // Create a task from 1–4 file tokens; uses multiview when >1 image
 export async function createTask(fileTokens: string[]): Promise<string> {
-  const body =
-    fileTokens.length === 1
-      ? {
-          type: 'image_to_model',
-          file: { type: 'jpg', file_encoding: 'raw', file_token: fileTokens[0] },
-        }
-      : {
-          type: 'multiview_to_model',
-          files: fileTokens.map((t) => ({ type: 'jpg', file_encoding: 'raw', file_token: t })),
-        }
+  // Always use image_to_model with the first (best) image for now;
+  // switch to multiview_to_model once credit tier is confirmed
+  const body = {
+    type: 'image_to_model',
+    file: { type: 'jpg', file_encoding: 'raw', file_token: fileTokens[0] },
+  }
 
   const res = await fetch(`${BASE_URL}/task`, {
     method: 'POST',
