@@ -1,8 +1,39 @@
+'use client'
+
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function LandingPage() {
+  const router = useRouter()
+  const [pendingTask, setPendingTask] = useState(false)
+
+  useEffect(() => {
+    const taskId = localStorage.getItem('lamp_taskId')
+    const jobId = localStorage.getItem('lamp_jobId')
+    if (taskId && jobId) setPendingTask(true)
+  }, [])
+
+  function resumeTask() {
+    const taskId = localStorage.getItem('lamp_taskId')
+    const jobId = localStorage.getItem('lamp_jobId')
+    if (taskId && jobId) {
+      router.push(`/processing?jobId=${jobId}&taskId=${encodeURIComponent(taskId)}`)
+    }
+  }
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-50">
+      {/* Resume banner */}
+      {pendingTask && (
+        <div className="bg-amber-500 text-white px-4 py-3 flex items-center justify-between">
+          <span className="text-sm font-medium">You have a model still processing</span>
+          <button onClick={resumeTask} className="text-sm font-bold underline">
+            Check status →
+          </button>
+        </div>
+      )}
+
       {/* Hero */}
       <section className="px-6 pt-16 pb-10 text-center">
         <div className="text-6xl mb-4">🏮</div>
@@ -28,8 +59,8 @@ export default function LandingPage() {
         </h2>
         <div className="space-y-4">
           {[
-            { icon: '📸', title: 'Capture', desc: 'Take 15–50 photos of any object — walk around it from all angles.' },
-            { icon: '🤖', title: '3D Scan', desc: 'AI reconstructs a 3D model from your photos in a few minutes.' },
+            { icon: '📸', title: 'Capture', desc: 'Take 4+ photos of any object — front, back, left, right.' },
+            { icon: '🤖', title: '3D Scan', desc: 'AI reconstructs a 3D model from your photos in about a minute.' },
             { icon: '📐', title: 'Extract', desc: 'Vector outlines are automatically generated — laser-cutter ready.' },
             { icon: '✂️', title: 'Make', desc: 'Download SVG, cut the paper, add a light — done!' },
           ].map((step, i) => (
@@ -50,7 +81,7 @@ export default function LandingPage() {
           {[
             { icon: '📱', label: 'Mobile first' },
             { icon: '🆓', label: '100% free' },
-            { icon: '⚡', label: '~3 min to SVG' },
+            { icon: '⚡', label: '~1 min to 3D' },
             { icon: '🖨️', label: 'Laser-cutter ready' },
           ].map((f) => (
             <div key={f.label} className="bg-white rounded-xl p-3 text-center shadow-sm">

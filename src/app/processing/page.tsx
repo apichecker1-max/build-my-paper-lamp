@@ -94,6 +94,14 @@ function ProcessingContent() {
     setTimeout(next, 800)
   }, [isDemo, jobId, router])
 
+  // Persist taskId so users can close and reopen the page
+  useEffect(() => {
+    if (!isDemo && taskId) {
+      localStorage.setItem('lamp_taskId', taskId)
+      localStorage.setItem('lamp_jobId', jobId)
+    }
+  }, [isDemo, taskId, jobId])
+
   // Real mode: poll /api/status every 2 seconds
   useEffect(() => {
     if (isDemo || !taskId) return
