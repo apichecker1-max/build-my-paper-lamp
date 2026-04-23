@@ -36,11 +36,14 @@ export default function ModelViewer({ modelUrl, className = '' }: Props) {
     renderer.shadowMap.enabled = true
     el.appendChild(renderer.domElement)
 
-    // Lights
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6))
-    const dir = new THREE.DirectionalLight(0xffd700, 1.2)
+    // Lights — tuned for flat-shaded facets
+    scene.add(new THREE.AmbientLight(0xfff8e7, 0.7))
+    const dir = new THREE.DirectionalLight(0xffd580, 1.4)
     dir.position.set(3, 5, 3)
     scene.add(dir)
+    const fill = new THREE.DirectionalLight(0xffecd2, 0.4)
+    fill.position.set(-3, 2, -2)
+    scene.add(fill)
 
     // Controls
     const controls = new OrbitControls(camera, renderer.domElement)
@@ -62,6 +65,7 @@ export default function ModelViewer({ modelUrl, className = '' }: Props) {
       modelUrl,
       (gltf) => {
         const model = gltf.scene
+
         // Center + normalize
         const box = new THREE.Box3().setFromObject(model)
         const center = box.getCenter(new THREE.Vector3())
@@ -70,6 +74,25 @@ export default function ModelViewer({ modelUrl, className = '' }: Props) {
         const scale = 2 / maxDim
         model.position.sub(center.multiplyScalar(scale))
         model.scale.setScalar(scale)
+
+        // Apply flat-shaded paper material + edge lines to every mesh
+        model.traverse((child) => {
+          const mesh = child as THREE.Mesh
+          if (!mesh.isMesh) return
+
+          mesh.material = new THREE.MeshStandardMaterial({
+            color: 0xf5c842,
+            flatShading: true,
+            roughness: 0.85,
+            metalness: 0.0,
+          })
+
+          // Edge lines — only show creases ≥ 20° so minor tessellation noise is hidden
+          const edges = new THREE.EdgesGeometry(mesh.geometry, 20)
+          const edgeMat = new THREE.LineBasicMaterial({ color: 0x7a4a1e })
+          mesh.add(new THREE.LineSegments(edges, edgeMat))
+        })
+
         scene.add(model)
       },
       undefined,
