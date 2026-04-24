@@ -26,12 +26,16 @@ export async function POST(req: NextRequest) {
     // Read all files into buffers
     const buffers: Buffer[] = []
     let totalBytes = 0
-    for (const file of files) {
-      const arr = await file.arrayBuffer()
+    console.log(`[upload] received ${files.length} files, first type: ${typeof files[0]}, constructor: ${files[0]?.constructor?.name}`)
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      console.log(`[upload] file ${i}: type=${typeof file} size=${(file as File).size ?? 'n/a'} name=${(file as File).name ?? 'n/a'}`)
+      const arr = await (file as File).arrayBuffer()
       const buf = Buffer.from(arr)
       buffers.push(buf)
       totalBytes += buf.byteLength
     }
+    console.log(`[upload] buffers ready: ${buffers.length}, totalBytes: ${totalBytes}`)
 
     const projectName = `lamp-${jobId}`
     console.log(`[upload] creating OpenScan project "${projectName}" with ${buffers.length} photos, ${totalBytes} bytes`)
