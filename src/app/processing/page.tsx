@@ -228,7 +228,7 @@ function ProcessingContent() {
       {!isDemo && timedOut && (
         <div className="mt-6 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-center">
           <p className="text-sm text-red-700 font-medium">Taking longer than expected</p>
-          <p className="text-xs text-red-500 mt-1 mb-3">Tripo AI may be under heavy load or the task got stuck.</p>
+          <p className="text-xs text-red-500 mt-1 mb-3">OpenScanCloud may be under heavy load or the scan failed. Try again with more photos.</p>
           <a href="/capture" className="inline-block bg-amber-500 text-white text-sm font-bold px-5 py-2 rounded-xl">
             Start over
           </a>

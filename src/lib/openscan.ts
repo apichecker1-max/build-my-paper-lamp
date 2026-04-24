@@ -25,13 +25,14 @@ export interface OpenScanProject {
   error?: string
 }
 
-// Step 1: create project → returns the Dropbox upload URL
+// Step 1: create project → returns one upload URL per photo
 export async function createProject(
   name: string,
   photoCount: number,
   totalBytes: number
-): Promise<string> {
-  const url = `${BASE_URL}/createProject?token=${encodeURIComponent(token())}&project=${encodeURIComponent(name)}&photos=${photoCount}&parts=1&filesize=${totalBytes}`
+): Promise<string[]> {
+  // parts=photoCount gives one Dropbox URL per photo — each photo uploaded individually
+  const url = `${BASE_URL}/createProject?token=${encodeURIComponent(token())}&project=${encodeURIComponent(name)}&photos=${photoCount}&parts=${photoCount}&filesize=${totalBytes}`
   const res = await fetch(url, { headers: baseHeaders() })
   const rawText = await res.text()
   console.log(`[openscan createProject] status=${res.status} body=${rawText.slice(0, 500)}`)
@@ -42,29 +43,27 @@ export async function createProject(
   catch { throw new Error(`OpenScan createProject non-JSON response: ${rawText}`) }
 
   const ulinks = data.ulink as string[] | undefined
-  if (!ulinks || ulinks.length === 0) throw new Error(`OpenScan createProject returned no upload URL: ${rawText}`)
+  if (!ulinks || ulinks.length === 0) throw new Error(`OpenScan createProject returned no upload URLs: ${rawText}`)
 
-  return ulinks[0]
+  console.log(`[openscan createProject] got ${ulinks.length} upload URLs`)
+  return ulinks
 }
 
-// Step 2: zip all photos and upload to the Dropbox URL
-export async function uploadPhotos(uploadUrl: string, photos: Buffer[]): Promise<void> {
-  const files: Record<string, Uint8Array> = {}
-  photos.forEach((buf, i) => {
-    files[`photo_${String(i).padStart(4, '0')}.jpg`] = new Uint8Array(buf)
-  })
-
-  const zipped = zipSync(files, { level: 0 }) // level 0 = store only, JPEGs don't compress further
-  console.log(`[openscan upload] uploading zip: ${zipped.byteLength} bytes for ${photos.length} photos`)
-
-  const res = await fetch(uploadUrl, {
-    method: 'POST',
-    headers: { ...baseHeaders(), 'Content-Type': 'application/octet-stream' },
-    body: Buffer.from(zipped),
-  })
-  const uploadResponseText = await res.text()
-  console.log(`[openscan upload] response status=${res.status} body=${uploadResponseText.slice(0, 200)}`)
-  if (!res.ok) throw new Error(`OpenScan upload failed: ${res.status} ${uploadResponseText}`)
+// Step 2: upload each photo individually to its own Dropbox URL
+export async function uploadPhotos(uploadUrls: string[], photos: Buffer[]): Promise<void> {
+  for (let i = 0; i < photos.length; i++) {
+    const uploadUrl = uploadUrls[i]
+    if (!uploadUrl) throw new Error(`No upload URL for photo ${i}`)
+    console.log(`[openscan upload] photo ${i + 1}/${photos.length} → ${photos[i].byteLength} bytes`)
+    const res = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: { ...baseHeaders(), 'Content-Type': 'application/octet-stream' },
+      body: new Uint8Array(photos[i]),
+    })
+    const text = await res.text()
+    if (!res.ok) throw new Error(`OpenScan upload failed at photo ${i}: ${res.status} ${text}`)
+    console.log(`[openscan upload] photo ${i + 1} ok — ${text.slice(0, 80)}`)
+  }
 }
 
 // Step 3: start processing
@@ -87,11 +86,16 @@ export async function getProjectStatus(projectName: string): Promise<OpenScanPro
   try { data = JSON.parse(text) as Record<string, unknown> }
   catch { throw new Error(`OpenScan getProjectInfo non-JSON: ${text}`) }
 
+  const rawStatus = ((data.status as string) ?? 'unknown').toLowerCase()
+  const isFailed = rawStatus.includes('fail') || rawStatus.includes('error')
+  const isDone = rawStatus === 'done' || rawStatus === 'completed' || rawStatus === 'finished'
+  const dlink = (data.dlink ?? data.downloadUrl ?? data.model_url ?? data.download) as string | undefined
+
   return {
     projectId: projectName,
-    status: (data.status as string) ?? 'unknown',
+    status: isFailed ? 'failed' : isDone ? 'completed' : rawStatus,
     progress: (data.progress as number) ?? 0,
-    downloadUrl: (data.downloadUrl ?? data.model_url ?? data.download ?? data.ulink) as string | undefined,
-    error: data.error as string | undefined,
+    downloadUrl: dlink && dlink.length > 0 ? dlink : undefined,
+    error: isFailed ? (data.status as string) : undefined,
   }
 }
