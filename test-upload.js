@@ -7,7 +7,7 @@ const fs = require('fs')
 const path = require('path')
 const FormData = require('form-data')
 
-const BASE_URL = 'https://build-my-paper-lamp.vercel.app'
+const BASE_URL = process.env.TEST_URL || 'http://localhost:3000'
 const PHOTO_COUNT = 15
 
 // Public domain sample photos (Unsplash — small sizes)

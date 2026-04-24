@@ -40,11 +40,11 @@ export async function POST(req: NextRequest) {
     const projectName = `lamp-${jobId}`
     console.log(`[upload] creating OpenScan project "${projectName}" with ${buffers.length} photos, ${totalBytes} bytes`)
 
-    const { uploadUrls } = await createProject(projectName, buffers.length, totalBytes)
-    console.log(`[upload] got ${uploadUrls.length} upload URLs`)
+    const uploadUrl = await createProject(projectName, buffers.length, totalBytes)
+    console.log(`[upload] got upload URL: ${uploadUrl.slice(0, 60)}...`)
 
-    await uploadPhotos(uploadUrls, buffers)
-    console.log(`[upload] all photos uploaded`)
+    await uploadPhotos(uploadUrl, buffers)
+    console.log(`[upload] zip uploaded successfully`)
 
     await startProcessing(projectName)
     console.log(`[upload] processing started`)
