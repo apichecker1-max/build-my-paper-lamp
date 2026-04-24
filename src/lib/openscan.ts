@@ -31,10 +31,13 @@ export async function createProject(
 ): Promise<{ projectName: string; uploadUrls: string[] }> {
   const url = `${BASE_URL}/createProject?token=${encodeURIComponent(token())}&project=${encodeURIComponent(name)}&photos=${photoCount}&parts=1&filesize=${totalBytes}`
   const res = await fetch(url, { headers: baseHeaders() })
-  if (!res.ok) throw new Error(`OpenScan createProject failed: ${res.status} ${await res.text()}`)
-  const data = await res.json()
-  // Response is an array of upload URLs
-  const uploadUrls: string[] = Array.isArray(data) ? data : (data.uploadLinks ?? data.links ?? [])
+  const rawText = await res.text()
+  console.log(`[openscan createProject] status=${res.status} body=${rawText.slice(0, 500)}`)
+  if (!res.ok) throw new Error(`OpenScan createProject failed: ${res.status} ${rawText}`)
+  let data: unknown
+  try { data = JSON.parse(rawText) } catch { throw new Error(`OpenScan createProject non-JSON: ${rawText}`) }
+  const uploadUrls: string[] = Array.isArray(data) ? data as string[] : ((data as Record<string, unknown>).uploadLinks ?? (data as Record<string, unknown>).links ?? []) as string[]
+  console.log(`[openscan createProject] got ${uploadUrls.length} upload URLs`)
   return { projectName: name, uploadUrls }
 }
 
