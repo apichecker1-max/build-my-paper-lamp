@@ -1,40 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getTaskStatus } from '@/lib/tripo'
+import { getProjectStatus } from '@/lib/openscan'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const taskId = searchParams.get('taskId')
+  const projectId = searchParams.get('projectId')
 
-  if (!taskId) {
-    return NextResponse.json({ error: 'taskId required' }, { status: 400 })
+  if (!projectId) {
+    return NextResponse.json({ error: 'projectId required' }, { status: 400 })
   }
 
   try {
-    const task = await getTaskStatus(taskId)
-    console.log(`[status] taskId=${taskId} status=${task.status} progress=${task.progress} modelUrl=${task.modelUrl ?? 'none'}`)
+    const scan = await getProjectStatus(projectId)
+    console.log(`[status] projectId=${projectId} status=${scan.status} progress=${scan.progress ?? 0}`)
 
-    if (task.status === 'failed' || task.status === 'banned' || task.status === 'expired') {
-      return NextResponse.json({ status: 'failed', error: task.error ?? 'Generation failed' })
+    if (scan.status === 'failed' || scan.error) {
+      return NextResponse.json({ status: 'failed', error: scan.error ?? 'Scan failed' })
     }
 
-    if (task.status === 'success' && task.modelUrl) {
-      return NextResponse.json({ status: 'completed', progress: 100, modelUrl: task.modelUrl })
+    if (scan.status === 'completed' && scan.downloadUrl) {
+      return NextResponse.json({ status: 'completed', progress: 100, modelUrl: scan.downloadUrl })
     }
 
-    // success but no modelUrl yet — treat as still running
-    if (task.status === 'success' && !task.modelUrl) {
-      console.warn(`[status] taskId=${taskId} success but no modelUrl — raw:`, JSON.stringify(task))
-      return NextResponse.json({ status: 'scanning', progress: 95, step: 'Finalising model…' })
-    }
-
-    const progress = task.status === 'pending' ? 10 : Math.max(10, task.progress)
     return NextResponse.json({
       status: 'scanning',
-      progress,
-      step: task.status === 'pending' ? 'Queued — waiting to start…' : `Generating 3D model… (${progress}%)`,
+      progress: scan.progress ?? 0,
+      step: `3D scanning in progress (${scan.progress ?? 0}%)`,
     })
   } catch (err) {
-    console.error(`[status] taskId=${taskId} error:`, err)
+    console.error('Status poll error:', err)
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Status check failed' },
       { status: 500 }

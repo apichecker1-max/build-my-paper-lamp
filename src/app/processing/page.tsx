@@ -42,7 +42,7 @@ function ProcessingContent() {
   const router = useRouter()
   const params = useSearchParams()
   const jobId = params.get('jobId') ?? ''
-  const taskId = params.get('taskId') ?? ''
+  const projectId = params.get('projectId') ?? ''
   const isDemo = params.get('demo') === 'true'
 
   const [progress, setProgress] = useState(0)
@@ -94,24 +94,24 @@ function ProcessingContent() {
     setTimeout(next, 800)
   }, [isDemo, jobId, router])
 
-  // Persist taskId so users can close and reopen the page
+  // Persist projectId so users can close and reopen the page
   useEffect(() => {
-    if (!isDemo && taskId) {
-      localStorage.setItem('lamp_taskId', taskId)
+    if (!isDemo && projectId) {
+      localStorage.setItem('lamp_projectId', projectId)
       localStorage.setItem('lamp_jobId', jobId)
     }
-  }, [isDemo, taskId, jobId])
+  }, [isDemo, projectId, jobId])
 
-  // Real mode: poll /api/status every 2 seconds
+  // Real mode: poll /api/status every 4 seconds
   useEffect(() => {
-    if (isDemo || !taskId) return
+    if (isDemo || !projectId) return
     setProgress(8)
-    setStep('Photos uploaded — waiting for Tripo AI…')
+    setStep('Photos uploaded — OpenScanCloud processing…')
 
     const id = setInterval(async () => {
       if (doneRef.current) return
       try {
-        const res = await fetch(`/api/status?taskId=${encodeURIComponent(taskId)}`)
+        const res = await fetch(`/api/status?projectId=${encodeURIComponent(projectId)}`)
         const data = await res.json()
         setLastPoll(new Date().toLocaleTimeString())
 
@@ -119,7 +119,7 @@ function ProcessingContent() {
           doneRef.current = true
           clearInterval(id)
           setFailed(true)
-          setFailMsg(data.error ?? 'Generation failed')
+          setFailMsg(data.error ?? 'Scan failed')
           return
         }
         if (data.status === 'completed') {
@@ -132,7 +132,6 @@ function ProcessingContent() {
           }, 800)
           return
         }
-        // Use real progress from Tripo if it's ahead of our fake progress
         if (data.progress > 15) {
           setProgress(prev => Math.max(prev, data.progress))
         }
@@ -140,9 +139,9 @@ function ProcessingContent() {
       } catch {
         // network hiccup — keep polling
       }
-    }, 2000)
+    }, 4000)
     return () => clearInterval(id)
-  }, [isDemo, taskId, jobId, router])
+  }, [isDemo, projectId, jobId, router])
 
   if (!jobId) {
     return (
@@ -215,14 +214,14 @@ function ProcessingContent() {
 
       {isDemo && (
         <p className="mt-6 text-xs text-amber-400 text-center bg-amber-100 rounded-xl px-4 py-2">
-          Demo mode — add your Tripo AI key to process real photos
+          Demo mode — add your OpenScanCloud token to process real photos
         </p>
       )}
 
       {!isDemo && !timedOut && (
         <div className="mt-6 bg-amber-100 rounded-xl px-4 py-3 text-center">
-          <p className="text-xs text-amber-600 font-medium">Tripo AI is building your model</p>
-          <p className="text-xs text-amber-400 mt-0.5">Usually takes 1–3 minutes — keep this page open</p>
+          <p className="text-xs text-amber-600 font-medium">OpenScanCloud is processing your photos</p>
+          <p className="text-xs text-amber-400 mt-0.5">Usually takes 3–10 minutes — you can close this page and come back</p>
         </div>
       )}
 
@@ -236,8 +235,8 @@ function ProcessingContent() {
         </div>
       )}
 
-      {!isDemo && taskId && (
-        <p className="mt-3 text-xs text-amber-300 text-center break-all">Task: {taskId.slice(0, 16)}…</p>
+      {!isDemo && projectId && (
+        <p className="mt-3 text-xs text-amber-300 text-center break-all">Project: {projectId.slice(0, 16)}…</p>
       )}
     </main>
   )

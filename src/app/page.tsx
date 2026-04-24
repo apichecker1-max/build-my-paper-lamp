@@ -9,16 +9,16 @@ export default function LandingPage() {
   const [pendingTask, setPendingTask] = useState(false)
 
   useEffect(() => {
-    const taskId = localStorage.getItem('lamp_taskId')
+    const projectId = localStorage.getItem('lamp_projectId')
     const jobId = localStorage.getItem('lamp_jobId')
-    if (taskId && jobId) setPendingTask(true)
+    if (projectId && jobId) setPendingTask(true)
   }, [])
 
   function resumeTask() {
-    const taskId = localStorage.getItem('lamp_taskId')
+    const projectId = localStorage.getItem('lamp_projectId')
     const jobId = localStorage.getItem('lamp_jobId')
-    if (taskId && jobId) {
-      router.push(`/processing?jobId=${jobId}&taskId=${encodeURIComponent(taskId)}`)
+    if (projectId && jobId) {
+      router.push(`/processing?jobId=${jobId}&projectId=${encodeURIComponent(projectId)}`)
     }
   }
 
