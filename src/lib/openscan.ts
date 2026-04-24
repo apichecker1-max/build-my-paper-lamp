@@ -1,100 +1,77 @@
 // OpenScanCloud REST API client
-// Docs: https://github.com/OpenScan-org/OpenScanCloud
-// Free tier: email cloud@openscan.eu for a token
-// Basic auth fallback: username=openscan, password=free
+// Base URL and flow confirmed from https://github.com/OpenScan-org/OpenScanCloud
+// All requests use GET + query params; Basic auth (openscan:free) on all calls.
+// Token is passed as a query param, not a header.
 
-const BASE_URL = 'https://cloud.openscan.eu'
+const BASE_URL = 'http://openscanfeedback.dnsuser.de:1334'
 
-function getAuthHeader(): string {
-  const token = process.env.OPENSCAN_TOKEN
-  if (token) {
-    return `Bearer ${token}`
-  }
-  // Public free tier fallback
-  return 'Basic ' + Buffer.from('openscan:free').toString('base64')
+const BASIC_AUTH = 'Basic ' + Buffer.from('openscan:free').toString('base64')
+
+function token() {
+  return process.env.OPENSCAN_TOKEN ?? ''
 }
 
-function headers() {
-  return {
-    Authorization: getAuthHeader(),
-    'Content-Type': 'application/json',
-  }
+function baseHeaders() {
+  return { Authorization: BASIC_AUTH }
 }
 
 export interface OpenScanProject {
-  projectId: string
+  projectId: string   // the project name used as ID
   status: string
   progress?: number
   downloadUrl?: string
   error?: string
 }
 
-export async function createProject(name: string): Promise<string> {
-  const res = await fetch(`${BASE_URL}/createProject`, {
-    method: 'POST',
-    headers: headers(),
-    body: JSON.stringify({ name, mode: 'object' }),
-  })
-  if (!res.ok) throw new Error(`OpenScan createProject failed: ${res.status}`)
+// Step 1: create project and get upload URLs back
+export async function createProject(
+  name: string,
+  photoCount: number,
+  totalBytes: number
+): Promise<{ projectName: string; uploadUrls: string[] }> {
+  const url = `${BASE_URL}/createProject?token=${encodeURIComponent(token())}&project=${encodeURIComponent(name)}&photos=${photoCount}&parts=1&filesize=${totalBytes}`
+  const res = await fetch(url, { headers: baseHeaders() })
+  if (!res.ok) throw new Error(`OpenScan createProject failed: ${res.status} ${await res.text()}`)
   const data = await res.json()
-  return data.projectId as string
+  // Response is an array of upload URLs
+  const uploadUrls: string[] = Array.isArray(data) ? data : (data.uploadLinks ?? data.links ?? [])
+  return { projectName: name, uploadUrls }
 }
 
+// Step 2: upload each photo to its corresponding URL
 export async function uploadPhotos(
-  projectId: string,
-  photos: Buffer[],
-  filenames: string[]
+  uploadUrls: string[],
+  photos: Buffer[]
 ): Promise<void> {
   for (let i = 0; i < photos.length; i++) {
-    const formData = new FormData()
-    formData.append('projectId', projectId)
-    formData.append('index', String(i))
-    formData.append(
-      'file',
-      new Blob([photos[i].buffer as ArrayBuffer], { type: 'image/jpeg' }),
-      filenames[i]
-    )
-    const res = await fetch(`${BASE_URL}/uploadImage`, {
+    const uploadUrl = uploadUrls[i] ?? uploadUrls[uploadUrls.length - 1]
+    const res = await fetch(uploadUrl, {
       method: 'POST',
-      headers: { Authorization: getAuthHeader() },
-      body: formData,
+      headers: { ...baseHeaders(), 'Content-Type': 'application/octet-stream' },
+      body: new Uint8Array(photos[i]),
     })
-    if (!res.ok) throw new Error(`OpenScan uploadImage failed at index ${i}: ${res.status}`)
+    if (!res.ok) throw new Error(`OpenScan upload failed at index ${i}: ${res.status} ${await res.text()}`)
   }
 }
 
-export async function startProcessing(projectId: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/startProject`, {
-    method: 'POST',
-    headers: headers(),
-    body: JSON.stringify({ projectId }),
-  })
-  if (!res.ok) throw new Error(`OpenScan startProject failed: ${res.status}`)
+// Step 3: start processing
+export async function startProcessing(projectName: string): Promise<void> {
+  const url = `${BASE_URL}/startProject?token=${encodeURIComponent(token())}&project=${encodeURIComponent(projectName)}`
+  const res = await fetch(url, { headers: baseHeaders() })
+  if (!res.ok) throw new Error(`OpenScan startProject failed: ${res.status} ${await res.text()}`)
 }
 
-export async function getProjectStatus(projectId: string): Promise<OpenScanProject> {
-  const res = await fetch(
-    `${BASE_URL}/getProjectInfo?projectId=${encodeURIComponent(projectId)}`,
-    { headers: headers() }
-  )
-  if (!res.ok) throw new Error(`OpenScan getProjectInfo failed: ${res.status}`)
+// Step 4: poll status
+export async function getProjectStatus(projectName: string): Promise<OpenScanProject> {
+  const url = `${BASE_URL}/getProjectInfo?token=${encodeURIComponent(token())}&project=${encodeURIComponent(projectName)}`
+  const res = await fetch(url, { headers: baseHeaders() })
+  if (!res.ok) throw new Error(`OpenScan getProjectInfo failed: ${res.status} ${await res.text()}`)
   const data = await res.json()
   return {
-    projectId,
+    projectId: projectName,
     status: data.status ?? 'unknown',
     progress: data.progress ?? 0,
-    downloadUrl: data.downloadUrl ?? data.model_url ?? undefined,
+    downloadUrl: data.downloadUrl ?? data.model_url ?? data.download ?? undefined,
     error: data.error ?? undefined,
-  }
-}
-
-export async function getQueueEstimate(): Promise<number> {
-  try {
-    const res = await fetch(`${BASE_URL}/getQueueEstimate`, { headers: headers() })
-    if (!res.ok) return 600
-    const data = await res.json()
-    return data.estimatedSeconds ?? 600
-  } catch {
-    return 600
   }
 }

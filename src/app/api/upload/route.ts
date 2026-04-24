@@ -23,24 +23,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ jobId, demo: true, photoCount: files.length })
     }
 
+    // Read all files into buffers
     const buffers: Buffer[] = []
-    const filenames: string[] = []
+    let totalBytes = 0
     for (const file of files) {
       const arr = await file.arrayBuffer()
-      buffers.push(Buffer.from(arr))
-      filenames.push(file.name || `photo_${filenames.length}.jpg`)
+      const buf = Buffer.from(arr)
+      buffers.push(buf)
+      totalBytes += buf.byteLength
     }
 
-    const projectId = await createProject(`lamp-${jobId}`)
-    console.log(`[upload] created OpenScan project ${projectId} for job ${jobId}`)
+    const projectName = `lamp-${jobId}`
+    console.log(`[upload] creating OpenScan project "${projectName}" with ${buffers.length} photos, ${totalBytes} bytes`)
 
-    await uploadPhotos(projectId, buffers, filenames)
-    console.log(`[upload] uploaded ${buffers.length} photos to project ${projectId}`)
+    const { uploadUrls } = await createProject(projectName, buffers.length, totalBytes)
+    console.log(`[upload] got ${uploadUrls.length} upload URLs`)
 
-    await startProcessing(projectId)
-    console.log(`[upload] started processing for project ${projectId}`)
+    await uploadPhotos(uploadUrls, buffers)
+    console.log(`[upload] all photos uploaded`)
 
-    return NextResponse.json({ jobId, projectId, photoCount: files.length })
+    await startProcessing(projectName)
+    console.log(`[upload] processing started`)
+
+    return NextResponse.json({ jobId, projectId: projectName, photoCount: files.length })
   } catch (err) {
     console.error('Upload error:', err)
     return NextResponse.json(
