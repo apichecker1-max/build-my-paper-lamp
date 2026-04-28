@@ -25,14 +25,14 @@ export interface OpenScanProject {
   error?: string
 }
 
-// Step 1: create project → returns one upload URL per photo
+// Step 1: create project → returns ONE upload URL for the zip
 export async function createProject(
   name: string,
   photoCount: number,
   totalBytes: number
 ): Promise<string[]> {
-  // parts=photoCount gives one Dropbox URL per photo — each photo uploaded individually
-  const url = `${BASE_URL}/createProject?token=${encodeURIComponent(token())}&project=${encodeURIComponent(name)}&photos=${photoCount}&parts=${photoCount}&filesize=${totalBytes}`
+  // parts=1 → OpenScanCloud returns a single Dropbox URL; all photos must arrive as one flat zip
+  const url = `${BASE_URL}/createProject?token=${encodeURIComponent(token())}&project=${encodeURIComponent(name)}&photos=${photoCount}&parts=1&filesize=${totalBytes}`
   const res = await fetch(url, { headers: baseHeaders() })
   const rawText = await res.text()
   console.log(`[openscan createProject] status=${res.status} body=${rawText.slice(0, 500)}`)
@@ -45,25 +45,30 @@ export async function createProject(
   const ulinks = data.ulink as string[] | undefined
   if (!ulinks || ulinks.length === 0) throw new Error(`OpenScan createProject returned no upload URLs: ${rawText}`)
 
-  console.log(`[openscan createProject] got ${ulinks.length} upload URLs`)
+  console.log(`[openscan createProject] got ${ulinks.length} upload URL(s)`)
   return ulinks
 }
 
-// Step 2: upload each photo individually to its own Dropbox URL
+// Step 2: zip all photos into one flat zip and upload to the single Dropbox URL
 export async function uploadPhotos(uploadUrls: string[], photos: Buffer[]): Promise<void> {
+  const uploadUrl = uploadUrls[0]
+  if (!uploadUrl) throw new Error('No upload URL returned from createProject')
+
+  const entries: Record<string, Uint8Array> = {}
   for (let i = 0; i < photos.length; i++) {
-    const uploadUrl = uploadUrls[i]
-    if (!uploadUrl) throw new Error(`No upload URL for photo ${i}`)
-    console.log(`[openscan upload] photo ${i + 1}/${photos.length} → ${photos[i].byteLength} bytes`)
-    const res = await fetch(uploadUrl, {
-      method: 'POST',
-      headers: { ...baseHeaders(), 'Content-Type': 'application/octet-stream' },
-      body: new Uint8Array(photos[i]),
-    })
-    const text = await res.text()
-    if (!res.ok) throw new Error(`OpenScan upload failed at photo ${i}: ${res.status} ${text}`)
-    console.log(`[openscan upload] photo ${i + 1} ok — ${text.slice(0, 80)}`)
+    entries[`photo_${String(i).padStart(4, '0')}.jpg`] = new Uint8Array(photos[i])
   }
+  const zipped = zipSync(entries, { level: 0 }) // level 0 = store-only; JPEGs don't compress
+  console.log(`[openscan upload] zipped ${photos.length} photos → ${zipped.byteLength} bytes, uploading…`)
+
+  const res = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: { ...baseHeaders(), 'Content-Type': 'application/octet-stream' },
+    body: zipped,
+  })
+  const text = await res.text()
+  if (!res.ok) throw new Error(`OpenScan zip upload failed: ${res.status} ${text}`)
+  console.log(`[openscan upload] zip upload ok — ${text.slice(0, 80)}`)
 }
 
 // Step 3: start processing
