@@ -64,7 +64,7 @@ export async function uploadPhotos(uploadUrls: string[], photos: Buffer[]): Prom
   const res = await fetch(uploadUrl, {
     method: 'POST',
     headers: { ...baseHeaders(), 'Content-Type': 'application/octet-stream' },
-    body: zipped,
+    body: Buffer.from(zipped),
   })
   const text = await res.text()
   if (!res.ok) throw new Error(`OpenScan zip upload failed: ${res.status} ${text}`)
