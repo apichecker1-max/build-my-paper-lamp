@@ -16,10 +16,9 @@ const DEMO_STEPS = [
 const DEMO_MODEL_URL =
   'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Duck/glTF-Binary/Duck.glb'
 
-// Tripo AI generates in roughly 1–3 minutes; these labels give honest feedback
 const REAL_STEPS = [
   { label: 'Photos uploaded',        progress: 8  },
-  { label: 'Queued on Tripo AI',     progress: 15 },
+  { label: 'Queued on Kiri Engine',  progress: 15 },
   { label: 'Analysing images',       progress: 30 },
   { label: 'Building 3D structure',  progress: 55 },
   { label: 'Generating mesh',        progress: 75 },
@@ -214,13 +213,13 @@ function ProcessingContent() {
 
       {isDemo && (
         <p className="mt-6 text-xs text-amber-400 text-center bg-amber-100 rounded-xl px-4 py-2">
-          Demo mode — add your OpenScanCloud token to process real photos
+          Demo mode — add your Kiri Engine API key to process real photos
         </p>
       )}
 
       {!isDemo && !timedOut && (
         <div className="mt-6 bg-amber-100 rounded-xl px-4 py-3 text-center">
-          <p className="text-xs text-amber-600 font-medium">OpenScanCloud is processing your photos</p>
+          <p className="text-xs text-amber-600 font-medium">Kiri Engine is processing your photos</p>
           <p className="text-xs text-amber-400 mt-0.5">Usually takes 3–10 minutes — you can close this page and come back</p>
         </div>
       )}
@@ -228,7 +227,7 @@ function ProcessingContent() {
       {!isDemo && timedOut && (
         <div className="mt-6 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-center">
           <p className="text-sm text-red-700 font-medium">Taking longer than expected</p>
-          <p className="text-xs text-red-500 mt-1 mb-3">OpenScanCloud may be under heavy load or the scan failed. Try again with more photos.</p>
+          <p className="text-xs text-red-500 mt-1 mb-3">Kiri Engine may be under heavy load. You can close this page and come back later.</p>
           <a href="/capture" className="inline-block bg-amber-500 text-white text-sm font-bold px-5 py-2 rounded-xl">
             Start over
           </a>
