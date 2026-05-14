@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getProjectStatus } from '@/lib/openscan'
+import { getStatus, getDownloadUrl } from '@/lib/kiri'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -10,24 +10,21 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const scan = await getProjectStatus(projectId)
-    console.log(`[status] projectId=${projectId} status=${scan.status} progress=${scan.progress ?? 0}`)
+    const { status, progress } = await getStatus(projectId)
+    console.log(`[status] serialize=${projectId} status=${status} progress=${progress}`)
 
-    if (scan.status === 'failed' || scan.error) {
-      return NextResponse.json({ status: 'failed', error: scan.error ?? 'Scan failed' })
+    if (status === 'failed') {
+      return NextResponse.json({ status: 'failed', error: 'Kiri Engine could not reconstruct the model' })
     }
 
-    if (scan.status === 'completed' && scan.downloadUrl) {
-      return NextResponse.json({ status: 'completed', progress: 100, modelUrl: scan.downloadUrl })
+    if (status === 'completed') {
+      const modelUrl = await getDownloadUrl(projectId)
+      return NextResponse.json({ status: 'completed', progress: 100, modelUrl })
     }
 
-    return NextResponse.json({
-      status: 'scanning',
-      progress: scan.progress ?? 0,
-      step: `3D scanning in progress (${scan.progress ?? 0}%)`,
-    })
+    return NextResponse.json({ status, progress, step: `3D scanning in progress (${progress}%)` })
   } catch (err) {
-    console.error('Status poll error:', err)
+    console.error('[status] error:', err)
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Status check failed' },
       { status: 500 }
