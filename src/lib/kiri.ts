@@ -11,14 +11,14 @@ function authHeader() {
 
 // Status codes returned by getStatus
 // -1 = failed, 0 = queued, 1-3 = processing, 4 = complete
-export function parseStatus(code: number): { status: string; progress: number } {
-  if (code === -1) return { status: 'failed', progress: 0 }
-  if (code === 0)  return { status: 'queued', progress: 5 }
-  if (code === 1)  return { status: 'processing', progress: 25 }
-  if (code === 2)  return { status: 'processing', progress: 55 }
-  if (code === 3)  return { status: 'processing', progress: 85 }
-  if (code === 4)  return { status: 'completed', progress: 100 }
-  return { status: 'processing', progress: 10 }
+export function parseStatus(code: number): { status: string; progress: number; stage: string } {
+  if (code === -1) return { status: 'failed',    progress: 0,   stage: 'failed'    }
+  if (code === 0)  return { status: 'queued',    progress: 10,  stage: 'queued'    }
+  if (code === 1)  return { status: 'processing', progress: 35, stage: 'analysing' }
+  if (code === 2)  return { status: 'processing', progress: 60, stage: 'building'  }
+  if (code === 3)  return { status: 'processing', progress: 85, stage: 'finalising'}
+  if (code === 4)  return { status: 'completed', progress: 100, stage: 'completed' }
+  return { status: 'processing', progress: 10, stage: 'queued' }
 }
 
 // Pick n evenly-spaced items from an array
@@ -59,7 +59,7 @@ export async function uploadImages(photos: Buffer[]): Promise<string> {
 }
 
 // Poll processing status
-export async function getStatus(serializeId: string): Promise<{ status: string; progress: number }> {
+export async function getStatus(serializeId: string): Promise<{ status: string; progress: number; stage: string }> {
   const res = await fetch(
     `${BASE_URL}/v1/open/model/getStatus?serialize=${encodeURIComponent(serializeId)}`,
     { headers: authHeader() }

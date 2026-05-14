@@ -10,8 +10,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { status, progress } = await getStatus(projectId)
-    console.log(`[status] serialize=${projectId} status=${status} progress=${progress}`)
+    const { status, progress, stage } = await getStatus(projectId)
+    console.log(`[status] serialize=${projectId} status=${status} stage=${stage} progress=${progress}`)
 
     if (status === 'failed') {
       return NextResponse.json({ status: 'failed', error: 'Kiri Engine could not reconstruct the model' })
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ status: 'completed', progress: 100, modelUrl })
     }
 
-    return NextResponse.json({ status, progress, step: `3D scanning in progress (${progress}%)` })
+    return NextResponse.json({ status, progress, stage, step: `3D scanning in progress (${progress}%)` })
   } catch (err) {
     console.error('[status] error:', err)
     return NextResponse.json(
